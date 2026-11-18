@@ -1,0 +1,43 @@
+# Android / Gradle / IDE
+*.iml
+.gradle/
+.kotlin/
+/local.properties
+local.properties
+/.idea/
+.DS_Store
+/build/
+app/build/
+/captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+*-debug.log
+
+# Secrets & Keystores
+.env
+*.jks
+*.keystore
+debug.keystore
+debug.keystore.base64
+
+# AI Studio Platform Runtime & Artifacts (kept locally for cloud builds, excluded from GitHub)
+.aistudio/
+.build-outputs/
+
+# Python / FastAPI Backend & Gemma Training
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.pytest_cache/
+backend/.env
+backend/*.db
+backend/*.sqlite3
+gemma_training/outputs/
+gemma_training/*.bin
+gemma_training/*.task

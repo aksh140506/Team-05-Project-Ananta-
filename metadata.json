@@ -1,0 +1,6 @@
+{
+  "name": "BankSathi",
+  "description": "Offline-first bilingual rural banking voice assistant (Team 05 RuralX Saathi) with ScamGuard pre-checks, verified document checklists, branch & CSP locator with verified dates, and grounded abstention.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
