@@ -1,0 +1,246 @@
+{
+  "entities": {
+    "Facility": {
+      "title": "Facility",
+      "description": "A rural banking touchpoint (BC Point, IPPB Post Office, ATM, or Bank Branch) with live open and cash availability status.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "UID of the user who registered this touchpoint."
+        },
+        "updatedByUid": {
+          "type": "string",
+          "description": "UID of the user who submitted the latest operational status."
+        },
+        "nameEn": {
+          "type": "string",
+          "description": "Facility name in English."
+        },
+        "nameHi": {
+          "type": "string",
+          "description": "Facility name in Hindi."
+        },
+        "facilityType": {
+          "type": "string",
+          "enum": ["BC_POINT", "IPPB", "ATM", "BRANCH"],
+          "description": "Type of banking touchpoint."
+        },
+        "villageOrArea": {
+          "type": "string",
+          "description": "Village or local landmark name."
+        },
+        "distanceMeters": {
+          "type": "integer",
+          "description": "Approximate distance from village center in meters."
+        },
+        "isOpen": {
+          "type": "boolean",
+          "description": "Whether the facility is currently open."
+        },
+        "cashStatus": {
+          "type": "string",
+          "enum": ["CASH_READY", "LOW_CASH", "NO_CASH", "UNKNOWN"],
+          "description": "Current cash availability status."
+        },
+        "lastReportStatus": {
+          "type": "string",
+          "enum": ["GOT_CASH", "LONG_LINE", "NO_CASH_CLOSED", "NONE"],
+          "description": "Most recent community feedback badge."
+        },
+        "reportsCount": {
+          "type": "integer",
+          "description": "Total number of community reports received."
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Whether the facility is active in the directory."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp (FieldValue.serverTimestamp()) when created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp (FieldValue.serverTimestamp()) of the last status update."
+        }
+      },
+      "required": [
+        "userId",
+        "updatedByUid",
+        "nameEn",
+        "nameHi",
+        "facilityType",
+        "villageOrArea",
+        "distanceMeters",
+        "isOpen",
+        "cashStatus",
+        "lastReportStatus",
+        "reportsCount",
+        "isActive",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "StatusReport": {
+      "title": "StatusReport",
+      "description": "Crowdsourced operational and AePS receipt report for a facility.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "UID of the reporting user."
+        },
+        "facilityId": {
+          "type": "string",
+          "description": "Parent facility document ID."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["GOT_CASH", "LONG_LINE", "NO_CASH_CLOSED"],
+          "description": "Reported operational status."
+        },
+        "receiptReceived": {
+          "type": "boolean",
+          "description": "Optional indicator of whether the user received a printed receipt."
+        },
+        "isPublic": {
+          "type": "boolean",
+          "description": "Whether the report is visible to community members."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp (FieldValue.serverTimestamp()) when submitted."
+        }
+      },
+      "required": [
+        "userId",
+        "facilityId",
+        "status",
+        "isPublic",
+        "createdAt"
+      ]
+    },
+    "TripChecklist": {
+      "title": "TripChecklist",
+      "description": "User's saved task routing and document bag check state.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner user UID."
+        },
+        "taskType": {
+          "type": "string",
+          "enum": ["WITHDRAW", "TRANSFER", "PASSBOOK_DBT", "LOAN_KCC"],
+          "description": "Selected banking task."
+        },
+        "amountInr": {
+          "type": "integer",
+          "description": "Target transaction amount in INR (0 if not applicable)."
+        },
+        "recommendedFacilityType": {
+          "type": "string",
+          "enum": ["BC_POINT", "IPPB", "ATM", "BRANCH"],
+          "description": "Recommended facility type for this task."
+        },
+        "checkedDocIds": {
+          "type": "array",
+          "description": "List of ticked document IDs (max 10)."
+        },
+        "receiptVerified": {
+          "type": "boolean",
+          "description": "Whether the user completed the post-visit receipt check."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp (FieldValue.serverTimestamp()) when created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp (FieldValue.serverTimestamp()) when updated."
+        }
+      },
+      "required": [
+        "userId",
+        "taskType",
+        "amountInr",
+        "recommendedFacilityType",
+        "checkedDocIds",
+        "receiptVerified",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ScamCheck": {
+      "title": "ScamCheck",
+      "description": "Logged Scam Sentinel evaluation of a suspicious SMS, call, or transaction scenario.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner user UID."
+        },
+        "inputSnippet": {
+          "type": "string",
+          "description": "User-submitted SMS or call description snippet."
+        },
+        "riskLevel": {
+          "type": "string",
+          "enum": ["SAFE", "CAUTION", "HIGH_RISK"],
+          "description": "Evaluated risk classification."
+        },
+        "explanationEn": {
+          "type": "string",
+          "description": "Plain-language guidance in English."
+        },
+        "explanationHi": {
+          "type": "string",
+          "description": "Plain-language guidance in Hindi."
+        },
+        "sourceMode": {
+          "type": "string",
+          "enum": ["GEMMA_LOCAL", "GEMINI_AI", "OFFLINE_HEURISTIC"],
+          "description": "Engine that produced the evaluation."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp (FieldValue.serverTimestamp()) when logged."
+        }
+      },
+      "required": [
+        "userId",
+        "inputSnippet",
+        "riskLevel",
+        "explanationEn",
+        "explanationHi",
+        "sourceMode",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/facilities/{facilityId}": {
+      "schema": { "$ref": "#/entities/Facility" },
+      "description": "Shared rural banking facilities with live operational and cash status."
+    },
+    "/facilities/{facilityId}/reports/{reportId}": {
+      "schema": { "$ref": "#/entities/StatusReport" },
+      "description": "Append-only community status and receipt reports for each facility."
+    },
+    "/users/{userId}/checklists/{checklistId}": {
+      "schema": { "$ref": "#/entities/TripChecklist" },
+      "description": "Private user bag-check checklists and receipt verification records."
+    },
+    "/users/{userId}/scamChecks/{checkId}": {
+      "schema": { "$ref": "#/entities/ScamCheck" },
+      "description": "Private user Scam Sentinel check history."
+    }
+  }
+}

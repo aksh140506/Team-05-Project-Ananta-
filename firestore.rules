@@ -1,0 +1,182 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: deny everything unless explicitly matched below
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidFacility(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.updatedByUid is string && data.updatedByUid.size() >= 1 && data.updatedByUid.size() <= 128 &&
+             data.nameEn is string && data.nameEn.size() >= 2 && data.nameEn.size() <= 140 &&
+             data.nameHi is string && data.nameHi.size() >= 2 && data.nameHi.size() <= 140 &&
+             data.facilityType in ['BC_POINT', 'IPPB', 'ATM', 'BRANCH'] &&
+             data.villageOrArea is string && data.villageOrArea.size() >= 2 && data.villageOrArea.size() <= 120 &&
+             data.distanceMeters is int && data.distanceMeters >= 0 && data.distanceMeters <= 100000 &&
+             data.isOpen is bool &&
+             data.cashStatus in ['CASH_READY', 'LOW_CASH', 'NO_CASH', 'UNKNOWN'] &&
+             data.lastReportStatus in ['GOT_CASH', 'LONG_LINE', 'NO_CASH_CLOSED', 'NONE'] &&
+             data.reportsCount is int && data.reportsCount >= 0 && data.reportsCount <= 1000000 &&
+             data.isActive is bool &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidStatusReport(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.facilityId is string && isValidId(data.facilityId) &&
+             data.status in ['GOT_CASH', 'LONG_LINE', 'NO_CASH_CLOSED'] &&
+             (!('receiptReceived' in data) || data.receiptReceived is bool) &&
+             data.isPublic is bool &&
+             data.createdAt is timestamp && data.createdAt <= request.time;
+    }
+
+    function isValidChecklist(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.taskType in ['WITHDRAW', 'TRANSFER', 'PASSBOOK_DBT', 'LOAN_KCC'] &&
+             data.amountInr is int && data.amountInr >= 0 && data.amountInr <= 500000 &&
+             data.recommendedFacilityType in ['BC_POINT', 'IPPB', 'ATM', 'BRANCH'] &&
+             data.checkedDocIds is list && data.checkedDocIds.size() <= 10 &&
+             (data.checkedDocIds.size() == 0 || (data.checkedDocIds[0] is string && data.checkedDocIds[0].size() <= 64)) &&
+             data.receiptVerified is bool &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidScamCheck(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.inputSnippet is string && data.inputSnippet.size() >= 1 && data.inputSnippet.size() <= 600 &&
+             data.riskLevel in ['SAFE', 'CAUTION', 'HIGH_RISK'] &&
+             data.explanationEn is string && data.explanationEn.size() >= 1 && data.explanationEn.size() <= 1200 &&
+             data.explanationHi is string && data.explanationHi.size() >= 1 && data.explanationHi.size() <= 1200 &&
+             data.sourceMode in ['GEMMA_LOCAL', 'GEMINI_AI', 'OFFLINE_HEURISTIC'] &&
+             data.createdAt is timestamp && data.createdAt <= request.time;
+    }
+
+    match /facilities/{facilityId} {
+      allow get: if isSignedIn() && isValidId(facilityId) && existing().isActive == true;
+      allow list: if isSignedIn() && existing().isActive == true;
+
+      allow create: if isSignedIn() &&
+                       isValidId(facilityId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().updatedByUid == request.auth.uid &&
+                       incoming().keys().hasAll([
+                         'userId', 'updatedByUid', 'nameEn', 'nameHi', 'facilityType',
+                         'villageOrArea', 'distanceMeters', 'isOpen', 'cashStatus',
+                         'lastReportStatus', 'reportsCount', 'isActive', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'updatedByUid', 'nameEn', 'nameHi', 'facilityType',
+                         'villageOrArea', 'distanceMeters', 'isOpen', 'cashStatus',
+                         'lastReportStatus', 'reportsCount', 'isActive', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidFacility(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(facilityId) &&
+                       isValidFacility(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedByUid == request.auth.uid &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'isOpen', 'cashStatus', 'lastReportStatus', 'reportsCount', 'updatedByUid', 'updatedAt'
+                       ]);
+
+      allow delete: if false;
+
+      match /reports/{reportId} {
+        allow get: if isSignedIn() && isValidId(facilityId) && isValidId(reportId) && existing().isPublic == true;
+        allow list: if isSignedIn() && existing().isPublic == true;
+
+        allow create: if isSignedIn() &&
+                         isValidId(facilityId) &&
+                         isValidId(reportId) &&
+                         incoming().userId == request.auth.uid &&
+                         incoming().facilityId == facilityId &&
+                         incoming().isPublic == true &&
+                         incoming().keys().hasAll(['userId', 'facilityId', 'status', 'isPublic', 'createdAt']) &&
+                         incoming().keys().hasOnly(['userId', 'facilityId', 'status', 'receiptReceived', 'isPublic', 'createdAt']) &&
+                         isValidStatusReport(incoming()) &&
+                         exists(/databases/$(database)/documents/facilities/$(facilityId));
+
+        allow update, delete: if false;
+      }
+    }
+
+    match /users/{userId}/checklists/{checklistId} {
+      allow get: if isSignedIn() && isValidId(userId) && isValidId(checklistId) && request.auth.uid == userId;
+      allow list: if isSignedIn() && request.auth.uid == userId && existing().userId == request.auth.uid;
+
+      allow create: if isSignedIn() &&
+                       isValidId(userId) &&
+                       isValidId(checklistId) &&
+                       request.auth.uid == userId &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().keys().hasAll([
+                         'userId', 'taskType', 'amountInr', 'recommendedFacilityType',
+                         'checkedDocIds', 'receiptVerified', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'taskType', 'amountInr', 'recommendedFacilityType',
+                         'checkedDocIds', 'receiptVerified', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidChecklist(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(userId) &&
+                       isValidId(checklistId) &&
+                       request.auth.uid == userId &&
+                       isValidChecklist(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'amountInr', 'recommendedFacilityType', 'checkedDocIds', 'receiptVerified', 'updatedAt'
+                       ]);
+
+      allow delete: if isSignedIn() && isValidId(userId) && isValidId(checklistId) && request.auth.uid == userId;
+    }
+
+    match /users/{userId}/scamChecks/{checkId} {
+      allow get: if isSignedIn() && isValidId(userId) && isValidId(checkId) && request.auth.uid == userId;
+      allow list: if isSignedIn() && request.auth.uid == userId && existing().userId == request.auth.uid;
+
+      allow create: if isSignedIn() &&
+                       isValidId(userId) &&
+                       isValidId(checkId) &&
+                       request.auth.uid == userId &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().keys().hasAll([
+                         'userId', 'inputSnippet', 'riskLevel',
+                         'explanationEn', 'explanationHi', 'sourceMode', 'createdAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'inputSnippet', 'riskLevel',
+                         'explanationEn', 'explanationHi', 'sourceMode', 'createdAt'
+                       ]) &&
+                       isValidScamCheck(incoming());
+
+      allow update: if false;
+      allow delete: if isSignedIn() && isValidId(userId) && isValidId(checkId) && request.auth.uid == userId;
+    }
+  }
+}
