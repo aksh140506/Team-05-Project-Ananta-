@@ -148,3 +148,193 @@ def generate_withdraw_le_10k_pool(rng: random.Random) -> list[dict[str, Any]]:
             ctx = rng.choice(contexts)
             target = {
                 "replyEn": f"For Rs {amt}, visit your nearest Bank Mitra (BC Point) with original Aadhaar and phone. No extra fee is allowed under RBI rules; always take a printed receipt.",
+                "replyHi": f"{amt} रुपये निकालने के लिए असली आधार कार्ड और फोन लेकर पास के बैंक मित्र केंद्र जाएं। RBI नियम से कोई अलग शुल्क नहीं है; छपी रसीद जरूर लें।",
+                "task": "WITHDRAW",
+                "suggestedAmountInr": amt,
+                "isScamAlert": False,
+                "abstained": False,
+            }
+            records.append(build_assistant_record(q, ctx, target, "withdraw_bc_le_10k", reg))
+            if reg in {"en", "hinglish"}:
+                noisy = apply_whisper_asr_noise(q, rng)
+                if normalize_key(noisy) != normalize_key(q):
+                    records.append(build_assistant_record(noisy, ctx, target, "withdraw_bc_le_10k", f"{reg}_asr"))
+    return records
+
+
+def generate_withdraw_gt_10k_pool(rng: random.Random) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    amounts = [10001, 11000, 12000, 15000, 18000, 20000, 25000, 30000, 35000, 40000, 45000, 50000, 75000, 100000]
+    templates = [
+        ("en", "How do I withdraw Rs {amt} cash for tractor or crop harvest?"),
+        ("en", "Can a village BC agent give me {amt} rupees in one AePS withdrawal?"),
+        ("en", "What should I pack to take out Rs {amt} from the bank safely?"),
+        ("en", "I need {amt} rupees cash today. Should I go to BC point or Bank Branch?"),
+        ("hi", "मुझे {amt} रुपये नकद निकालने हैं, क्या बैंक मित्र एक बार में दे देगा?"),
+        ("hi", "फसल कटाई के लिए {amt} रुपये चाहिए, बैंक शाखा जाऊं या एटीएम?"),
+        ("hi", "{amt} रुपये निकालने के लिए कौन से दस्तावेज साथ ले जाने होंगे?"),
+        ("hinglish", "Mujhe {amt} rupaye nikalne hain bank se, BC centre dega ya branch jana hoga?"),
+        ("hinglish", "khata se {amt} rs cash chahiye kya passbook aur atm card le kar branch jaun"),
+        ("hinglish", "kheti ke kaam ke liye {amt} rupaye chahiye kahan se jaldi milega"),
+    ]
+    for amt in amounts:
+        for reg, tmpl in templates:
+            q = tmpl.format(amt=amt)
+            target = {
+                "replyEn": f"Rs {amt} exceeds the Rs 10,000 BC limit. Visit your Bank Branch or ATM with your passbook, original Aadhaar, and debit card.",
+                "replyHi": f"{amt} रुपये बीसी केंद्र की 10,000 रुपये सीमा से अधिक हैं। पासबुक, असली आधार और एटीएम कार्ड लेकर बैंक शाखा या एटीएम जाएं।",
+                "task": "WITHDRAW",
+                "suggestedAmountInr": amt,
+                "isScamAlert": False,
+                "abstained": False,
+            }
+            records.append(build_assistant_record(q, CTX_DEFAULT, target, "withdraw_branch_gt_10k", reg))
+            if reg in {"en", "hinglish"}:
+                noisy = apply_whisper_asr_noise(q, rng)
+                if normalize_key(noisy) != normalize_key(q):
+                    records.append(build_assistant_record(noisy, CTX_DEFAULT, target, "withdraw_branch_gt_10k", f"{reg}_asr"))
+    return records
+
+
+def generate_transfer_pool(rng: random.Random) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    amounts = [500, 1000, 1500, 2000, 2500, 3000, 4500, 5000, 7500, 8000, 10000, 15000, 20000]
+    contexts = [CTX_DEFAULT, CTX_TRANSFER]
+    templates = [
+        ("en", "I want to send Rs {amt} to my son studying in the city. What documents are needed?"),
+        ("en", "How can I deposit Rs {amt} into my relative's bank account from my village?"),
+        ("en", "Can Post Office IPPB transfer {amt} rupees safely if I do not have a smartphone?"),
+        ("en", "What details of the receiver should I carry to send Rs {amt}?"),
+        ("hi", "मुझे बेटे के खाते में {amt} रुपये भेजने हैं, कहाँ जाऊं और क्या ले जाऊं?"),
+        ("hi", "गाँव से {amt} रुपये दूसरे के खाते में जमा करने के लिए कौन से कागज लगेंगे?"),
+        ("hi", "क्या डाकघर IPPB या बैंक मित्र से {amt} रुपये सुरक्षित भेजे जा सकते हैं?"),
+        ("hinglish", "Mujhe {amt} rupaye bete ko bhejne hain, Post Office IPPB se ho jayega kya?"),
+        ("hinglish", "rishtedar ke khate mein {amt} rs jama karna hai kya kya likh ke le jaun"),
+        ("hinglish", "gaon se shahar {amt} rupaye transfer karne ka sabse aasan rasta batao"),
+    ]
+    for amt in amounts:
+        for reg, tmpl in templates:
+            q = tmpl.format(amt=amt)
+            ctx = rng.choice(contexts)
+            target = {
+                "replyEn": f"Visit your Post Office (IPPB) or Bank Mitra to send Rs {amt}. Carry original Aadhaar, receiver account number with IFSC, and always take a printed receipt.",
+                "replyHi": f"{amt} रुपये भेजने के लिए डाकघर (IPPB) या बैंक मित्र केंद्र जाएं। असली आधार, पाने वाले का खाता नंबर व IFSC ले जाएं और छपी रसीद लें।",
+                "task": "TRANSFER",
+                "suggestedAmountInr": amt,
+                "isScamAlert": False,
+                "abstained": False,
+            }
+            records.append(build_assistant_record(q, ctx, target, "transfer_ippb_bc", reg))
+            if reg in {"en", "hinglish"}:
+                noisy = apply_whisper_asr_noise(q, rng)
+                if normalize_key(noisy) != normalize_key(q):
+                    records.append(build_assistant_record(noisy, ctx, target, "transfer_ippb_bc", f"{reg}_asr"))
+    return records
+
+
+def generate_passbook_dbt_pool(rng: random.Random) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    schemes = [
+        ("PM-Kisan installment", "पीएम-किसान किस्त", "pm kisan kist"),
+        ("old-age pension DBT", "वृद्धावस्था पेंशन डीबीटी", "budhapa pension"),
+        ("MGNREGA wage credit", "मनरेगा मजदूरी पैसा", "narega mazdoori"),
+        ("LPG gas subsidy", "गैस सब्सिडी पैसा", "gas subsidy"),
+        ("widow pension subsidy", "विधवा पेंशन किस्त", "vidhwa pension"),
+        ("scholarship DBT", "छात्रवृत्ति डीबीटी", "scholarship paisa"),
+    ]
+    bsbda_variants = [
+        ("en", "Is minimum balance required in my Jan Dhan account?", "No. Jan Dhan (BSBDA) accounts are zero-balance with unlimited deposits and at least 4 free withdrawals per month.", "नहीं। जन धन (BSBDA) जीरो-बैलेंस खाता है। इसमें जमा की सीमा नहीं है और महीने में कम से कम 4 निकासी मुफ्त हैं।"),
+        ("en", "How many free withdrawals per month are permitted under RBI BSBDA rules?", "Under RBI BSBDA rules, you get at least 4 free withdrawals per month, including ATM withdrawals, with zero minimum balance.", "RBI BSBDA नियमों के अनुसार जीरो-बैलेंस खाते में महीने में कम से कम 4 निकासी मुफ्त होती हैं।"),
+        ("en", "Can the bank fine me if my PMJDY zero balance account has Rs 0?", "No penalty applies on a genuine PMJDY / BSBDA zero-balance account, and monthly deposits are unlimited.", "जन धन या BSBDA जीरो-बैलेंस खाते में 0 रुपये रहने पर कोई जुर्माना नहीं लगता और जमा की सीमा नहीं है।"),
+        ("en", "Is there any limit on deposits in a Basic Savings Bank Deposit Account?", "No. BSBDA / Jan Dhan accounts allow unlimited cash or DBT deposits with zero minimum balance penalty.", "नहीं। जन धन (BSBDA) खाते में महीने में पैसे जमा करने की कोई सीमा नहीं है।"),
+        ("hi", "क्या जन धन खाते में मिनिमम बैलेंस न रखने पर जुर्माना लगता है?", "कोई जुर्माना नहीं लगता। जन धन (BSBDA) जीरो-बैलेंस खाता है और महीने में 4 निकासी मुफ्त मिलती हैं।", "कोई जुर्माना नहीं लगता। जन धन (BSBDA) जीरो-बैलेंस खाता है और महीने में 4 निकासी मुफ्त मिलती हैं।"),
+        ("hi", "जन धन खाते से महीने में कितनी बार मुफ्त पैसे निकाल सकते हैं?", "RBI नियमों के तहत जन धन (BSBDA) खाते में महीने में कम से कम 4 निकासी मुफ्त होती हैं।", "RBI नियमों के तहत जन धन (BSBDA) खाते में महीने में कम से कम 4 निकासी मुफ्त होती हैं।"),
+        ("hinglish", "Jan dhan khate me kam se kam kitna paisa rakhna zaroori hai?", "Zero minimum balance is needed in a Jan Dhan (BSBDA) account, and you get at least 4 free monthly withdrawals.", "जन धन (BSBDA) खाते में न्यूनतम बैलेंस रखने की जरूरत नहीं है। महीने में कम से कम 4 निकासी मुफ्त होती हैं।"),
+        ("hinglish", "mera zero balance PMJDY khata hai usme paisa jama karne ki limit hoti hai kya", "No deposit limit applies on a PMJDY / BSBDA zero-balance account, and 4 monthly withdrawals are free.", "जन धन जीरो-बैलेंस खाते में जमा करने की कोई सीमा नहीं है और महीने में 4 निकासी मुफ्त हैं।"),
+    ]
+    for reg, q, r_en, r_hi in bsbda_variants:
+        if reg == "hi":
+            r_en_final = "No penalty applies. PMJDY / BSBDA accounts have zero minimum balance, unlimited deposits, and 4 free monthly withdrawals."
+        else:
+            r_en_final = r_en
+        target = {
+            "replyEn": r_en_final,
+            "replyHi": r_hi,
+            "task": "PASSBOOK_DBT",
+            "suggestedAmountInr": 0,
+            "isScamAlert": False,
+            "abstained": False,
+        }
+        records.append(build_assistant_record(q, CTX_BSBDA, target, "passbook_dbt_bsbda", reg))
+        noisy = apply_whisper_asr_noise(q, rng)
+        if normalize_key(noisy) != normalize_key(q):
+            records.append(build_assistant_record(noisy, CTX_BSBDA, target, "passbook_dbt_bsbda", f"{reg}_asr"))
+
+    for en_s, hi_s, hg_s in schemes:
+        dbt_prompts = [
+            ("en", f"How do I check if my {en_s} arrived and update my passbook?"),
+            ("en", f"Where should I go to verify my {en_s} credit and print entries?"),
+            ("en", f"Can Bank Mitra check my {en_s} mini-statement or print the passbook?"),
+            ("hi", f"मेरी {hi_s} खाते में आई या नहीं, और पासबुक प्रिंट कहाँ होगी?"),
+            ("hi", f"{hi_s} की जांच करने के लिए कौन से कागज लेकर कहाँ जाऊं?"),
+            ("hinglish", f"meri {hg_s} aayi ya nahi aur passbook entry kahan chhapegi?"),
+            ("hinglish", f"{hg_s} check karne ke liye bc point jaun ya branch passbook le kar"),
+        ]
+        for reg, q in dbt_prompts:
+            target = {
+                "replyEn": f"Check your {en_s} mini-statement quickly at a Bank Mitra (BC Point) with Aadhaar, or visit your Bank Branch with your physical passbook for printing.",
+                "replyHi": f"{hi_s} की मिनी-स्टेटमेंट जांच बीसी केंद्र पर आधार से तुरंत हो जाएगी। पूरी पासबुक छपवाने के लिए बैंक शाखा जाएं।",
+                "task": "PASSBOOK_DBT",
+                "suggestedAmountInr": 0,
+                "isScamAlert": False,
+                "abstained": False,
+            }
+            records.append(build_assistant_record(q, CTX_DEFAULT, target, "passbook_dbt_bsbda", reg))
+            if reg in {"en", "hinglish"}:
+                noisy = apply_whisper_asr_noise(q, rng)
+                if normalize_key(noisy) != normalize_key(q):
+                    records.append(build_assistant_record(noisy, CTX_DEFAULT, target, "passbook_dbt_bsbda", f"{reg}_asr"))
+
+    return records
+
+
+def generate_kcc_loan_pool(rng: random.Random) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    # Up to 2,00,000 -> collateral-free at Branch
+    collateral_free_amts = [25000, 50000, 75000, 100000, 120000, 150000, 160000, 180000, 200000]
+    cf_templates = [
+        ("en", "How do I apply for a Rs {amt} Kisan Credit Card loan without land mortgage?"),
+        ("en", "What documents should I pack before leaving home for a Rs {amt} KCC loan?"),
+        ("en", "Can a village BC point approve my Rs {amt} KCC agricultural loan?"),
+        ("hi", "बिना जमीन गिरवी रखे {amt} रुपये तक का केसीसी कृषि लोन कैसे और कहाँ मिलेगा?"),
+        ("hi", "मुझे खेती के लिए {amt} रुपये का केसीसी लोन लेना है, कौन से कागज ले जाऊं?"),
+        ("hinglish", "KCC loan {amt} rs lene ke liye kaunse kagaz chahiye aur branch jana hoga kya?"),
+        ("hinglish", "bina zameen girvi rakhe {amt} rupaye ka kisan credit card mil jayega kya"),
+    ]
+    for amt in collateral_free_amts:
+        for reg, tmpl in cf_templates:
+            q = tmpl.format(amt=amt)
+            target = {
+                "replyEn": f"Under RBI rules, KCC agricultural loans up to Rs 2,00,000 are collateral-free and must be processed at a Bank Branch. Carry Khatauni, 2 Aadhaar+PAN copies, passbook, and 3 photos.",
+                "replyHi": "RBI नियमों के तहत 2,00,000 रुपये तक का केसीसी (KCC) कृषि लोन बिना गारंटी बैंक शाखा से मिलता है। खतौनी, आधार-पैन की 2 कॉपी, पासबुक और 3 फोटो ले जाएं।",
+                "task": "LOAN_KCC",
+                "suggestedAmountInr": amt,
+                "isScamAlert": False,
+                "abstained": False,
+            }
+            records.append(build_assistant_record(q, CTX_KCC, target, "loan_kcc", reg))
+            if reg in {"en", "hinglish"}:
+                noisy = apply_whisper_asr_noise(q, rng)
+                if normalize_key(noisy) != normalize_key(q):
+                    records.append(build_assistant_record(noisy, CTX_KCC, target, "loan_kcc", f"{reg}_asr"))
+
+    # Above 2,00,000 -> Branch assessment + collateral/security rules apply above 2L cap
+    above_2l_amts = [220000, 250000, 300000, 400000, 500000]
+    above_templates = [
+        ("en", "Do I need land security or collateral for a Rs {amt} KCC farm loan?"),
+        ("hi", "{amt} रुपये के बड़े केसीसी लोन के लिए क्या जमीन के कागज और गारंटी लगेगी?"),
+        ("hinglish", "mujhe {amt} rupaye ka kcc loan chahiye kya 2 lakh se upar bina guarantee milega"),
+    ]
+    for amt in above_2l_amts:
+        for reg, tmpl in above_templates:
+            q = tmpl.format(amt=amt)
