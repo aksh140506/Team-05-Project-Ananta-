@@ -83,3 +83,89 @@ def main() -> None:
     model.config.use_cache = False
 
     lora_config = LoraConfig(
+        r=args.lora_r,
+        lora_alpha=args.lora_alpha,
+        lora_dropout=0.05,
+        bias="none",
+        task_type="CAUSAL_LM",
+        target_modules=[
+            "q_proj",
+            "k_proj",
+            "v_proj",
+            "o_proj",
+            "gate_proj",
+            "up_proj",
+            "down_proj",
+        ],
+    )
+
+    dataset = load_dataset(
+        "json",
+        data_files={"train": args.train_file, "validation": args.eval_file},
+    )
+
+    # Mask user prompt tokens so loss is computed strictly on the JSON model response
+    response_template = "<start_of_turn>model\n"
+    collator = DataCollatorForCompletionOnlyLM(
+        response_template=response_template,
+        tokenizer=tokenizer,
+    )
+
+    training_args = TrainingArguments(
+        output_dir=str(adapter_dir),
+        num_train_epochs=args.epochs,
+        per_device_train_batch_size=args.batch_size,
+        per_device_eval_batch_size=args.batch_size,
+        gradient_accumulation_steps=args.grad_accum,
+        learning_rate=args.lr,
+        lr_scheduler_type="cosine",
+        warmup_ratio=0.08,
+        weight_decay=0.01,
+        logging_steps=5,
+        eval_strategy="epoch",
+        save_strategy="epoch",
+        load_best_model_at_end=True,
+        metric_for_best_model="eval_loss",
+        bf16=use_bf16,
+        fp16=not use_bf16,
+        gradient_checkpointing=True,
+        optim="paged_adamw_8bit",
+        report_to="none",
+    )
+
+    trainer = SFTTrainer(
+        model=model,
+        tokenizer=tokenizer,
+        args=training_args,
+        train_dataset=dataset["train"],
+        eval_dataset=dataset["validation"],
+        dataset_text_field="text",
+        max_seq_length=args.max_seq_len,
+        peft_config=lora_config,
+        data_collator=collator,
+    )
+
+    trainer.train()
+    trainer.save_model(str(adapter_dir))
+    tokenizer.save_pretrained(str(adapter_dir))
+    print(f"Saved best LoRA adapter to {adapter_dir}")
+
+    if not args.skip_merge:
+        print(f"Merging LoRA adapter into standalone FP16/BF16 weights at {merged_dir}...")
+        del trainer, model
+        torch.cuda.empty_cache()
+
+        peft_model = AutoPeftModelForCausalLM.from_pretrained(
+            str(adapter_dir),
+            torch_dtype=torch.float16,
+            device_map="auto",
+        )
+        merged_model = peft_model.merge_and_unload()
+        merged_dir.mkdir(parents=True, exist_ok=True)
+        merged_model.save_pretrained(str(merged_dir), safe_serialization=True)
+        tokenizer.save_pretrained(str(merged_dir))
+        print(f"Merged model ready for MediaPipe INT4 conversion at: {merged_dir}")
+
+
+if __name__ == "__main__":
+    main()
