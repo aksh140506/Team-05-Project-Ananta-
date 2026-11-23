@@ -338,3 +338,223 @@ def generate_kcc_loan_pool(rng: random.Random) -> list[dict[str, Any]]:
     for amt in above_2l_amts:
         for reg, tmpl in above_templates:
             q = tmpl.format(amt=amt)
+            target = {
+                "replyEn": f"Only KCC loans up to Rs 2,00,000 are collateral-free under RBI rules. For Rs {amt}, visit your Bank Branch with Khatauni, KYC copies, passbook, and photos for security assessment.",
+                "replyHi": f"RBI नियम के तहत केवल 2,00,000 रुपये तक का KCC लोन बिना गारंटी मिलता है। {amt} रुपये के लिए खतौनी, केवाईसी, पासबुक व फोटो लेकर बैंक शाखा में बात करें।",
+                "task": "LOAN_KCC",
+                "suggestedAmountInr": amt,
+                "isScamAlert": False,
+                "abstained": False,
+            }
+            records.append(build_assistant_record(q, CTX_KCC, target, "loan_kcc", reg))
+
+    return records
+
+
+def generate_assistant_scam_pool(rng: random.Random) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    vectors = [
+        ("en", "Someone called claiming to be from SBI and asked for my 6-digit OTP to stop account block."),
+        ("en", "The BC agent said my thumbprint failed and told me to scan twice without giving a receipt."),
+        ("en", "Caller asked me to install AnyDesk remote app to credit my pending PM-Kisan refund."),
+        ("en", "Got an SMS with a bit.ly link saying PAN KYC expired today—should I tap it?"),
+        ("en", "Someone wants my RuPay ATM PIN and CVV over phone to verify DBT transfer."),
+        ("en", "Fraudster sent a .apk file on WhatsApp for fast KYC update, should I install it?"),
+        ("en", "Money was debited after I shared an OTP on a fake lottery call. How many days do I have?"),
+        ("en", "Caller told me to enter UPI PIN in PhonePe to receive Rs 15,000 crop compensation."),
+        ("hi", "फोन पर बैंक अधिकारी बनकर मेरा एटीएम पिन और ओटीपी मांग रहा है, क्या बता दूं?"),
+        ("hi", "SMS आया है कि खाता बंद हो जाएगा, इस bit.ly लिंक पर क्लिक करें। क्या करूं?"),
+        ("hi", "बैंक मित्र ने अंगूठा लगवाया, पैसे नहीं दिए और रसीद भी नहीं दी, दुबारा अंगूठा मांग रहा है।"),
+        ("hi", "कॉलर बोल रहा है TeamViewer या AnyDesk ऐप डालकर 9 अंक का कोड बताओ तो सब्सिडी आएगी।"),
+        ("hi", "नकली केवाईसी लिंक पर क्लिक करने से मेरे खाते से पैसे कट गए, अब कितने दिन में रिपोर्ट करूं?"),
+        ("hi", "व्हाट्सएप पर अनजान .apk फाइल भेजकर केवाईसी करने को कह रहा है, क्या डाल लूं?"),
+        ("hinglish", "Phone par lottery jeetne ka call aaya aur UPI PIN dalne ko bol raha hai."),
+        ("hinglish", "Mere account se bina bataye paise kat gaye fraud link se, ab kya karun?"),
+        ("hinglish", "aadmi bol raha hai otp batao tabhi kisan samman nidhi ka paisa aayega"),
+        ("hinglish", "bc agent ne raseed nahi diya aur dobara thumb scan karne bol raha hai"),
+        ("hinglish", "quicksupport app download karwa ke atm card number pooch raha hai"),
+        ("hinglish", "bank manager bol ke cvv aur pin pooch raha hai phone par kya karun"),
+    ]
+    for reg, q in vectors:
+        target = {
+            "replyEn": "ScamGuard Alert: Never share OTP, PIN, CVV, install screen-share apps, or scan your thumb twice without a printed receipt. Hang up, call 1930, and inform your bank within 3 working days.",
+            "replyHi": "स्कैम गार्ड चेतावनी: कभी भी OTP, पिन, स्क्रीन-शेयर ऐप न दें और बिना रसीद दो बार अंगूठा न लगाएं। तुरंत फोन काटें, 1930 पर कॉल करें और 3 दिन में बैंक को बताएं।",
+            "task": "NONE",
+            "suggestedAmountInr": 0,
+            "isScamAlert": True,
+            "abstained": False,
+        }
+        records.append(build_assistant_record(q, CTX_ZERO_LIAB, target, "assistant_scam_alert", reg))
+        noisy = apply_whisper_asr_noise(q, rng)
+        if normalize_key(noisy) != normalize_key(q):
+            records.append(build_assistant_record(noisy, CTX_ZERO_LIAB, target, "assistant_scam_alert", f"{reg}_asr"))
+    return records
+
+
+def generate_abstention_pool(rng: random.Random) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    # Mix of live private banking data, unverified rumor traps, out-of-domain queries, and empty/missing-context probes
+    traps = [
+        ("en", "How much exact balance is in my SBI account number 30491 right now?"),
+        ("en", "Did Ramesh Verma's NEFT transfer of Rs 4000 clear at 2 PM today?"),
+        ("en", "What is my forgotten 4-digit RuPay ATM PIN?"),
+        ("en", "Tell me today's live interest rate of XYZ Private Microfinance App."),
+        ("en", "Will the government double PM-Kisan to Rs 12000 next month?"),
+        ("en", "Can you check my personal CIBIL credit score offline right now?"),
+        ("en", "Is the Rampur Bank Mitra shop physically open at this exact minute?"),
+        ("en", "What is the live share price of SBI and HDFC today?"),
+        ("en", "What medicine should I take for high fever and joint pain?"),
+        ("en", "Which private chit fund doubles money in 90 days?"),
+        ("en", "Tell me today's gold price and rain forecast for Sitapur."),
+        ("en", "Did RBI announce a brand new loan waiver scheme 10 minutes ago?"),
+        ("hi", "मेरे बैंक खाते में अभी ठीक-ठीक कितने रुपये बचे हैं, बता दो?"),
+        ("hi", "आज मेरे गाँव की मंडी में गेहूं और धान का लाइव भाव क्या है?"),
+        ("hi", "क्या अगले हफ्ते नया सरकारी कर्ज माफी नियम आने वाला है?"),
+        ("hi", "मेरे गाँव का बैंक मित्र अभी इस समय दुकान खोलकर बैठा है या बंद है?"),
+        ("hi", "मेरे एटीएम कार्ड का भुला हुआ 4 अंक का पिन क्या है, अभी बताओ?"),
+        ("hi", "बुखार और खांसी के लिए कौन सी दवाई खाना सही रहेगा?"),
+        ("hi", "पिछले महीने मेरी भैंस बीमा क्लेम की फाइल पास हुई या नहीं, अभी जांच कर बताओ?"),
+        ("hinglish", "Mera pichhla RTGS transaction fail kyon hua, live status check karo."),
+        ("hinglish", "mere khate me abhi kitna balance bacha hai exact batao"),
+        ("hinglish", "kal sarkar naya 5000 rupaye wala yojana shuru karegi kya"),
+        ("hinglish", "private unknown app se 5 minute mein 50000 loan lena sahi hai kya"),
+        ("hinglish", "mera atm pin bhul gaya hun abhi naya pin bata do"),
+        ("hinglish", "aaj mandi mein sarso ka bhav kya chal raha hai"),
+        ("hinglish", "konsa share kharidein jo 1 mahine me paisa double kar de"),
+    ]
+    for reg, q in traps:
+        target = {
+            "replyEn": "I am not sure about this and cannot verify live personal or unverified facts offline. BankSathi never guesses—please visit your nearest verified Bank Branch or call 14448 / 1930.",
+            "replyHi": "मुझे इसकी पक्की जानकारी नहीं है क्योंकि लाइव खाता या असत्यापित डेटा ऑफलाइन नहीं देखा जा सकता। कृपया नज़दीकी बैंक शाखा में पूछें या 14448 / 1930 पर कॉल करें।",
+            "task": "NONE",
+            "suggestedAmountInr": 0,
+            "isScamAlert": False,
+            "abstained": True,
+        }
+        records.append(build_assistant_record(q, CTX_DEFAULT, target, "safe_abstention", reg))
+        noisy = apply_whisper_asr_noise(q, rng)
+        if normalize_key(noisy) != normalize_key(q):
+            records.append(build_assistant_record(noisy, CTX_DEFAULT, target, "safe_abstention", f"{reg}_asr"))
+    return records
+
+
+def generate_scam_guard_sms_pool(rng: random.Random) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+
+    high_risk = [
+        ("en", "Dear customer your SBI YONO account will be blocked today. Update PAN KYC immediately at http://bit.ly/sbi-kyc-99 or call 98xxxxxxx.",
+         "Fake KYC warning SMS with a shortened link. Real banks never threaten account closure via bit.ly links.",
+         "यह नकली KYC लिंक वाला धोखाधड़ी संदेश है। असली बैंक कभी ऐसे छोटे लिंक भेजकर खाता बंद करने की धमकी नहीं देते।",
+         "Do not click the link. Delete the SMS and call 1930 or your official bank branch if you shared details.",
+         "लिंक पर बिल्कुल क्लिक न करें। यदि कोई जानकारी दे दी है तो तुरंत 1930 पर कॉल करें और 3 कार्य दिवस में बैंक को सूचित करें।"),
+        ("en", "Caller says: Sir I am calling from RBI Mumbai, your PM-Kisan Rs 6000 is stuck. Tell me the 6-digit OTP on your phone to release it.",
+         "High-risk OTP vishing scam. RBI and government offices never call citizens asking for OTPs to release subsidies.",
+         "यह गंभीर OTP ठगी कॉल है। RBI या सरकारी अधिकारी कभी किस्त भेजने के लिए फोन पर ओटीपी नहीं मांगते।",
+         "Hang up immediately. Never share OTP. Report the number on 1930 and alert your bank within 3 working days.",
+         "तुरंत फोन काट दें और ओटीपी न बताएं। ठगी होने पर 1930 पर कॉल करें और 3 कार्य दिवस में बैंक को बताएं।"),
+        ("en", "BC agent says machine failed after first thumb scan, asks me to press thumb again without giving a printed receipt.",
+         "Danger of unauthorized AePS double withdrawal. Never scan your fingerprint twice without verifying a printed failure receipt.",
+         "बिना रसीद दोबारा अंगूठा लगवाना AePS ठगी का खतरा है। पहली जांच की छपी रसीद और बैंक SMS देखे बिना दोबारा अंगूठा न लगाएं।",
+         "Refuse a second scan until you get a printed receipt and check your SMS balance. Report fraud to 1930 within 3 working days.",
+         "बिना छपी रसीद और बैलेंस SMS देखे दोबारा अंगूठा न लगाएं। शक होने पर 1930 पर कॉल करें और 3 कार्य दिवस में बैंक में शिकायत करें।"),
+        ("en", "Download QuickSupport_KYC.apk from WhatsApp and share the 9-digit screen code to unblock your ATM card.",
+         "Screen-sharing malware trap! Sharing AnyDesk or QuickSupport codes lets fraudsters steal money from your phone.",
+         "यह स्क्रीन-शेयरिंग ऐप का खतरनाक जाल है। QuickSupport या AnyDesk कोड देने से ठग आपके खाते से पैसे निकाल सकते हैं।",
+         "Never install .apk files from WhatsApp. Delete immediately and call 1930; inform your bank within 3 working days.",
+         "व्हाट्सएप से कोई .apk फाइल या स्क्रीन-शेयर ऐप न डालें। गलती से हो जाए तो तुरंत 1930 पर कॉल करें और 3 दिन में बैंक को बताएं।"),
+        ("en", "Congratulations! You won Rs 25 Lakh KBC lottery. Enter your UPI PIN in PhonePe to receive the prize money.",
+         "UPI PIN scam! You never need to enter your UPI PIN to receive money—PIN is only for sending money.",
+         "यह लॉटरी ठगी है। पैसे प्राप्त करने के लिए कभी भी UPI पिन डालने की जरूरत नहीं होती, पिन केवल पैसे भेजने में लगता है।",
+         "Block the sender immediately and report on 1930. Contact your bank within 3 working days if money was debited.",
+         "तुरंत नंबर ब्लॉक करें। पैसे कटने पर 1930 पर शिकायत करें और RBI नियम के अनुसार 3 कार्य दिवस में बैंक को बताएं।"),
+        ("hinglish", "Aapka bank khata aaj raat band ho jayega, abhi AnyDesk app download karke OTP batayein.",
+         "High-risk fraud combining fake account block threat, AnyDesk remote access, and OTP theft.",
+         "यह गंभीर धोखाधड़ी है जिसमें खाता बंद करने का डर दिखाकर AnyDesk और OTP मांगा जा रहा है।",
+         "Do not install AnyDesk or share OTP. Call 1930 immediately and report to your bank within 3 working days.",
+         "AnyDesk ऐप न डालें और ओटीपी न बताएं। तुरंत 1930 पर कॉल करें और 3 कार्य दिवस में बैंक को सूचित करें।"),
+        ("hi", "बिजली बिल और केवाईसी अपडेट के लिए इस tinyurl लिंक पर 10 रुपये का भुगतान करें वरना कनेक्शन और खाता बंद होगा।",
+         "Phishing link scam pretending to be an urgent bill/KYC payment to steal card or UPI credentials.",
+         "यह नकली बिल और KYC भुगतान लिंक ठगी है। 10 रुपये के नाम पर आपका पूरा बैंक खाता खाली किया जा सकता है।",
+         "Never click tinyurl links for KYC or bills. Call 1930 and alert your bank within 3 working days if money was lost.",
+         "ऐसे लिंक पर बिल्कुल क्लिक न करें। पैसे कटने पर तुरंत 1930 पर कॉल करें और 3 दिन में बैंक में शिकायत दर्ज करें।"),
+        ("hi", "व्हाट्सएप पर कॉल करके बोला कि आपका सिम और बैंक खाता 2 घंटे में बंद होगा, अभी RustDesk ऐप डालो।",
+         "High-risk remote access scam using fake SIM/bank deactivation fear to install RustDesk.",
+         "यह सिम या खाता बंद होने का डर दिखाकर RustDesk स्क्रीन-शेयर ऐप डलवाने की गंभीर ठगी है।",
+         "Hang up and never install remote apps. Call 1930 and inform your bank within 3 working days if shared.",
+         "फोन काटें और कोई रिमोट ऐप न डालें। धोखाधड़ी होने पर 1930 पर कॉल करें और 3 दिन में बैंक को बताएं।"),
+    ]
+    for reg, snip, ex_en, ex_hi, tip_en, tip_hi in high_risk:
+        records.append(
+            build_scam_record(
+                snip,
+                {
+                    "riskLevel": "HIGH_RISK",
+                    "explanationEn": ex_en,
+                    "explanationHi": ex_hi,
+                    "actionTipEn": tip_en,
+                    "actionTipHi": tip_hi,
+                },
+                "scam_high_risk",
+                reg,
+            )
+        )
+
+    caution = [
+        ("en", "Local Bank Mitra is demanding Rs 50 extra commission for withdrawing Rs 2000 via Aadhaar thumb scan.",
+         "Caution: Under RBI Business Correspondent rules, Bank Mitras cannot demand extra unofficial fees from customers.",
+         "सावधानी: RBI नियमों के अनुसार बैंक मित्र (BC) निकासी के लिए ग्राहक से अलग से शुल्क या कमीशन नहीं मांग सकता।",
+         "Insist on a printed receipt and report extra-fee demands to your main Bank Branch or RBI helpline 14448.",
+         "छपी हुई रसीद जरूर लें और अतिरिक्त शुल्क की शिकायत मुख्य बैंक शाखा या RBI हेल्पलाइन 14448 पर करें।"),
+        ("en", "SMS received: Your loan pre-approval offer expires tonight. Call private agent number 9911xxxx00 urgently.",
+         "Caution: Urgent loan offers from private mobile numbers often hide processing-fee scams.",
+         "सावधानी: निजी मोबाइल नंबर से आने वाले जल्दबाजी वाले लोन ऑफर अक्सर प्रोसेसिंग फीस ठगी का तरीका होते हैं।",
+         "Do not pay any advance processing fee. Verify loan schemes directly at your official Bank Branch.",
+         "पहले से कोई प्रोसेसिंग फीस न दें। लोन की जानकारी सीधे अपनी सरकारी या मुख्य बैंक शाखा से ही लें।"),
+        ("en", "Unknown caller claims to be from bank head office asking me to visit a link tomorrow to check subsidy status.",
+         "Caution: Unverified external links can steal personal details even if no OTP was asked yet.",
+         "सावधानी: अनजान लिंक पर क्लिक करने से आपकी निजी जानकारी चोरी हो सकती है, चाहे अभी ओटीपी न मांगा गया हो।",
+         "Ignore unknown links. Check subsidy status safely at your Bank Mitra or official Bank Branch.",
+         "अनजान लिंक न खोलें। सब्सिडी की जांच बैंक मित्र केंद्र या बैंक शाखा से ही कराएं।"),
+        ("hinglish", "Bank Mitra kehta hai 5000 nikalne par 30 rupaye alag charge lagega, bina raseed ke.",
+         "Caution: RBI forbids Business Correspondents from charging extra cash fees or refusing printed receipts.",
+         "सावधानी: RBI नियमों के खिलाफ बैंक मित्र अलग से नकद शुल्क मांग रहा है और छपी रसीद नहीं दे रहा है।",
+         "Refuse extra cash charges, demand a printed receipt, or visit another verified BC / Branch and call 14448.",
+         "अतिरिक्त शुल्क न दें, छपी रसीद मांगें या मुख्य बैंक शाखा में जाएं और 14448 पर शिकायत करें।"),
+        ("en", "WhatsApp message offering instant Mudra loan in 10 minutes if I send Rs 999 registration fee first.",
+         "Caution: Official Mudra and KCC loans never ask for advance registration fees via WhatsApp.",
+         "सावधानी: सरकारी मुद्रा या KCC लोन के लिए व्हाट्सएप पर पहले से रजिस्ट्रेशन फीस नहीं मांगी जाती।",
+         "Do not send any advance fee. Apply only through your official Bank Branch or JanSamarth portal.",
+         "कोई अग्रिम फीस न भेजें। लोन के लिए केवल अपनी असली बैंक शाखा में ही आवेदन करें।"),
+        ("hi", "एक अनजान एजेंट कह रहा है कि 500 रुपये देने पर केसीसी लोन बिना कागज 2 दिन में पास करा देगा।",
+         "Caution: Official KCC loans never require cash bribes or agent fees to bypass branch document checks.",
+         "सावधानी: असली केसीसी लोन में एजेंट को नकद पैसे देने की जरूरत नहीं होती; केवल बैंक शाखा में ही आवेदन करें।",
+         "Do not pay middlemen. Visit your official Bank Branch directly with Khatauni and KYC documents.",
+         "किसी दलाल को पैसे न दें। खतौनी और केवाईसी लेकर सीधे अपनी बैंक शाखा में जाएं।"),
+    ]
+    for reg, snip, ex_en, ex_hi, tip_en, tip_hi in caution:
+        records.append(
+            build_scam_record(
+                snip,
+                {
+                    "riskLevel": "CAUTION",
+                    "explanationEn": ex_en,
+                    "explanationHi": ex_hi,
+                    "actionTipEn": tip_en,
+                    "actionTipHi": tip_hi,
+                },
+                "scam_caution",
+                reg,
+            )
+        )
+
+    safe = [
+        ("en", "Your A/c X4512 is credited with Rs 2,000.00 on 14-Nov-26 via DBT PM-KISAN. Avl Bal Rs 5,420.50 - State Bank of India.",
+         "Safe official credit alert: This is a standard DBT subsidy credit SMS with no suspicious link, phone number, or OTP request.",
+         "सुरक्षित सूचना: यह सरकारी पीएम-किसान किस्त जमा होने का सामान्य बैंक SMS है। इसमें कोई संदिग्ध लिंक या ओटीपी मांग नहीं है।",
+         "No action needed. Keep your passbook updated during your next branch visit.",
+         "यह संदेश सुरक्षित है। अगली बार बैंक जाने पर अपनी पासबुक अपडेट करा लें।"),
+        ("en", "Dear Customer, your Bank Mitra withdrawal of Rs 1,500 is successful. Ref No 631892. Avl Bal Rs 3,100 - IPPB.",
+         "Safe transaction confirmation SMS matching your withdrawal. No link or personal credential request is present.",
+         "सुरक्षित संदेश: यह आपकी निकासी की आधिकारिक पुष्टि वाला SMS है। इसमें कोई संदिग्ध लिंक या पिन नहीं मांगा गया है।",
+         "Verify the amount matches the cash you received and keep your printed receipt safely.",
+         "मिलाएं कि निकाली गई राशि सही है और बैंक मित्र से मिली छपी रसीद संभाल कर रखें।"),
