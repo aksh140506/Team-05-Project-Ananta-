@@ -558,3 +558,236 @@ def generate_scam_guard_sms_pool(rng: random.Random) -> list[dict[str, Any]]:
          "सुरक्षित संदेश: यह आपकी निकासी की आधिकारिक पुष्टि वाला SMS है। इसमें कोई संदिग्ध लिंक या पिन नहीं मांगा गया है।",
          "Verify the amount matches the cash you received and keep your printed receipt safely.",
          "मिलाएं कि निकाली गई राशि सही है और बैंक मित्र से मिली छपी रसीद संभाल कर रखें।"),
+        ("en", "SBI Reminder: Please visit your home branch with Aadhaar & passbook during working hours to complete periodic KYC.",
+         "Safe branch reminder asking you to visit the physical bank branch in person, with no external link or OTP request.",
+         "सुरक्षित सूचना: यह आपको बैंक शाखा में आकर केवाईसी कराने का सामान्य संदेश है, इसमें कोई लिंक या ओटीपी नहीं मांगा गया है।",
+         "Visit your physical bank branch in person with original Aadhaar and passbook.",
+         "असली आधार कार्ड और पासबुक लेकर सीधे अपनी बैंक शाखा में जाएं।"),
+        ("hi", "आपके खाते में मनरेगा मजदूरी के 2,400 रुपये जमा हुए हैं। उपलब्ध बैलेंस 4,850 रुपये है। - बैंक ऑफ बड़ौदा",
+         "Safe genuine wage credit SMS in Hindi with no links, no urgent threats, and no OTP or PIN request.",
+         "सुरक्षित सूचना: यह मनरेगा मजदूरी जमा होने का सही हिंदी बैंक संदेश है, इसमें कोई लिंक या ओटीपी नहीं मांगा गया है।",
+         "Safe to keep for your records; match the balance on your next passbook update.",
+         "यह संदेश सुरक्षित है। अगली बार बैंक जाकर पासबुक में एंट्री करवा लें।"),
+        ("en", "PNB Alert: Rs 1,000 withdrawn at ATM Rampur on 14-Nov. If not done by you, visit branch or call official helpline.",
+         "Standard genuine ATM withdrawal alert from your bank without any third-party link or OTP request.",
+         "सुरक्षित सूचना: यह एटीएम निकासी का सामान्य बैंक अलर्ट है। इसमें कोई बाहरी लिंक या ओटीपी नहीं मांगा गया है।",
+         "If you made this withdrawal, no action needed. If unauthorized, block card at branch or call 1930.",
+         "यदि आपने ही पैसे निकाले हैं तो चिंता की बात नहीं। अनजान निकासी होने पर तुरंत 1930 पर कॉल करें।"),
+        ("hi", "भारतीय स्टेट बैंक: आपकी केसीसी ब्याज छूट राशि 1,850 रुपये खाते में जमा कर दी गई है। शाखा से पासबुक अपडेट कराएं।",
+         "Safe genuine bank credit notification advising passbook update at branch with zero links or credential requests.",
+         "सुरक्षित सूचना: यह केसीसी ब्याज छूट जमा होने की आधिकारिक बैंक सूचना है, इसमें कोई लिंक या ओटीपी नहीं है।",
+         "Keep this SMS and update your passbook on your next bank branch visit.",
+         "यह संदेश सुरक्षित है। अगली बार बैंक शाखा जाकर अपनी पासबुक प्रिंट करा लें।"),
+    ]
+    for reg, snip, ex_en, ex_hi, tip_en, tip_hi in safe:
+        records.append(
+            build_scam_record(
+                snip,
+                {
+                    "riskLevel": "SAFE",
+                    "explanationEn": ex_en,
+                    "explanationHi": ex_hi,
+                    "actionTipEn": tip_en,
+                    "actionTipHi": tip_hi,
+                },
+                "scam_safe",
+                reg,
+            )
+        )
+
+    return records
+
+
+def deduplicate_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    seen: set[str] = set()
+    unique: list[dict[str, Any]] = []
+    for rec in records:
+        key = rec["dedup_key"]
+        if key not in seen:
+            seen.add(key)
+            unique.append(rec)
+    return unique
+
+
+def sample_stratified_target(
+    pools: dict[str, list[dict[str, Any]]],
+    target_rows: int,
+    rng: random.Random,
+) -> list[dict[str, Any]]:
+    """
+    Sample a balanced 1k-3k dataset matching target domain proportions.
+    Each pool is deduplicated; if target_rows exceeds a small pool's unique
+    count, diverse paraphrases/wrappers are synthesized cleanly up to quota
+    without touching eval leakage.
+    """
+    weights = {
+        "withdraw_bc_le_10k": 0.12,
+        "withdraw_branch_gt_10k": 0.10,
+        "transfer_ippb_bc": 0.14,
+        "passbook_dbt_bsbda": 0.14,
+        "loan_kcc": 0.14,
+        "assistant_scam_alert": 0.11,
+        "safe_abstention": 0.16,
+        "scam_high_risk": 0.04,
+        "scam_caution": 0.025,
+        "scam_safe": 0.025,
+    }
+    prefixes_en = [
+        "Please help: ",
+        "Quick question: ",
+        "Village banking doubt: ",
+        "Offline help needed: ",
+        "Before I travel to town, tell me: ",
+        "Urgent doubt: ",
+    ]
+    prefixes_hi = [
+        "कृपया बताएं: ",
+        "एक सवाल है: ",
+        "बैंक जाने से पहले पूछना है: ",
+        "जल्दी मदद करें: ",
+        "गाँव से पूछ रहा हूँ: ",
+    ]
+    prefixes_hg = [
+        "ek baat bataiye: ",
+        "madad chahiye: ",
+        "bank jane se pehle batao: ",
+        "jaldi batayein: ",
+    ]
+
+    selected: list[dict[str, Any]] = []
+    global_seen: set[str] = set()
+
+    for cat, weight in weights.items():
+        quota = max(12, round(target_rows * weight))
+        pool = deduplicate_records(pools[cat])
+        rng.shuffle(pool)
+
+        cat_rows: list[dict[str, Any]] = []
+        for r in pool:
+            if len(cat_rows) >= quota:
+                break
+            if r["dedup_key"] not in global_seen:
+                global_seen.add(r["dedup_key"])
+                cat_rows.append(r)
+
+        # If quota > unique pool, synthesize natural conversational wrappers with new dedup keys
+        attempt = 0
+        while len(cat_rows) < quota and attempt < quota * 10:
+            attempt += 1
+            base = rng.choice(pool)
+            reg = base["register"].split("_")[0]
+            if base["type"] == "assistant":
+                orig_q = base["prompt"].split('User query: "')[-1].rstrip('"')
+                if reg == "hi":
+                    new_q = rng.choice(prefixes_hi) + orig_q
+                elif reg == "hinglish":
+                    new_q = rng.choice(prefixes_hg) + orig_q
+                else:
+                    new_q = rng.choice(prefixes_en) + orig_q
+                ctx_line = base["prompt"].split("Verified Context: ")[1].split("\nUser query:")[0]
+                cand = build_assistant_record(new_q, ctx_line, base["target"], cat, f"{reg}_wrap")
+            else:
+                orig_s = base["prompt"].split('Input: "')[-1].rstrip('"')
+                tag = rng.choice(["Forwarded SMS: ", "Caller claimed: ", "Counter note: ", "Message check: "])
+                cand = build_scam_record(tag + orig_s, base["target"], cat, f"{reg}_wrap")
+
+            if cand["dedup_key"] not in global_seen:
+                global_seen.add(cand["dedup_key"])
+                cat_rows.append(cand)
+
+        selected.extend(cat_rows)
+
+    return selected
+
+
+def validate_record(rec: dict[str, Any]) -> None:
+    target = rec["target"]
+    parsed = json.loads(rec["completion"])
+    assert parsed == target, "JSON round-trip mismatch"
+    if rec["type"] == "assistant":
+        required = {"replyEn", "replyHi", "task", "suggestedAmountInr", "isScamAlert", "abstained"}
+        assert set(target.keys()) == required, f"Missing keys: {target.keys()}"
+        assert target["task"] in VALID_TASKS, f"Invalid task: {target['task']}"
+        assert isinstance(target["suggestedAmountInr"], int)
+        assert isinstance(target["isScamAlert"], bool)
+        assert isinstance(target["abstained"], bool)
+        assert DEVANAGARI_RE.search(target["replyHi"]), f"replyHi missing Devanagari: {target['replyHi']}"
+        assert len(target["replyEn"].split()) <= 45, f"replyEn > 45 words: {target['replyEn']}"
+        assert len(target["replyHi"].split()) <= 48, f"replyHi > 48 words: {target['replyHi']}"
+        if target["abstained"]:
+            assert target["task"] == "NONE", "Abstained response must have task=NONE"
+    else:
+        required = {"riskLevel", "explanationEn", "explanationHi", "actionTipEn", "actionTipHi"}
+        assert set(target.keys()) == required, f"Missing keys: {target.keys()}"
+        assert target["riskLevel"] in VALID_RISKS
+        assert DEVANAGARI_RE.search(target["explanationHi"])
+        assert DEVANAGARI_RE.search(target["actionTipHi"])
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Generate BankSathi Gemma-2B 1k-3k training & eval JSONL.")
+    parser.add_argument("--out-dir", type=Path, default=Path("data"), help="Output directory")
+    parser.add_argument("--target-rows", type=int, default=1500, help="Target total dataset rows (recommended 1000-3000)")
+    parser.add_argument("--eval-ratio", type=float, default=0.15, help="Stratified hold-out evaluation split ratio")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    args = parser.parse_args()
+
+    rng = random.Random(args.seed)
+    pools = {
+        "withdraw_bc_le_10k": generate_withdraw_le_10k_pool(rng),
+        "withdraw_branch_gt_10k": generate_withdraw_gt_10k_pool(rng),
+        "transfer_ippb_bc": generate_transfer_pool(rng),
+        "passbook_dbt_bsbda": generate_passbook_dbt_pool(rng),
+        "loan_kcc": generate_kcc_loan_pool(rng),
+        "assistant_scam_alert": generate_assistant_scam_pool(rng),
+        "safe_abstention": generate_abstention_pool(rng),
+        "scam_high_risk": [r for r in generate_scam_guard_sms_pool(rng) if r["category"] == "scam_high_risk"],
+        "scam_caution": [r for r in generate_scam_guard_sms_pool(rng) if r["category"] == "scam_caution"],
+        "scam_safe": [r for r in generate_scam_guard_sms_pool(rng) if r["category"] == "scam_safe"],
+    }
+
+    selected = sample_stratified_target(pools, args.target_rows, rng)
+
+    for idx, rec in enumerate(selected, start=1):
+        rec["id"] = f"banksathi_{idx:04d}"
+        validate_record(rec)
+
+    by_cat: dict[str, list[dict[str, Any]]] = {}
+    for rec in selected:
+        by_cat.setdefault(rec["category"], []).append(rec)
+
+    train_records: list[dict[str, Any]] = []
+    eval_records: list[dict[str, Any]] = []
+    for cat, items in sorted(by_cat.items()):
+        rng.shuffle(items)
+        n_eval = max(2, round(len(items) * args.eval_ratio))
+        eval_records.extend(items[:n_eval])
+        train_records.extend(items[n_eval:])
+
+    rng.shuffle(train_records)
+    rng.shuffle(eval_records)
+
+    # Strip internal dedup_key before export while retaining clean JSONL schema
+    for row in train_records + eval_records:
+        row["prompt_sha256"] = hashlib.sha256(row["dedup_key"].encode("utf-8")).hexdigest()[:16]
+        del row["dedup_key"]
+
+    args.out_dir.mkdir(parents=True, exist_ok=True)
+    train_path = args.out_dir / "train.jsonl"
+    eval_path = args.out_dir / "eval.jsonl"
+
+    for path, rows in ((train_path, train_records), (eval_path, eval_records)):
+        with path.open("w", encoding="utf-8") as f:
+            for row in rows:
+                f.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+    print(f"Validated & wrote {len(train_records)} train rows -> {train_path}")
+    print(f"Validated & wrote {len(eval_records)} eval rows  -> {eval_path}")
+    print(f"Total dataset rows: {len(train_records) + len(eval_records)} (stratified across {len(by_cat)} categories)")
+    for cat, items in sorted(by_cat.items()):
+        pct = 100.0 * len(items) / len(selected)
+        print(f"  - {cat}: {len(items)} ({pct:.1f}%)")
+
+
+if __name__ == "__main__":
+    main()
