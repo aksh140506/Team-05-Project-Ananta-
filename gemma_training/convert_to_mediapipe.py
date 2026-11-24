@@ -53,3 +53,56 @@ def main() -> None:
     args.output_task.parent.mkdir(parents=True, exist_ok=True)
 
     # 1. Convert Hugging Face Safetensors -> INT4 Dynamic Quantized TFLite via ai-edge-torch
+    from ai_edge_torch.generative.examples.gemma import gemma1, gemma2
+    from ai_edge_torch.generative.utilities import converter as edge_converter
+    from ai_edge_torch.generative.quantize import quant_recipes
+    import mediapipe as mp  # noqa: F401
+    from mediapipe.tasks.python.genai import bundler
+
+    print(f"Building {args.model_family} INT4 TFLite graph from {args.merged_dir}...")
+    if args.model_family == "gemma2":
+        pytorch_model = gemma2.build_2b_model(str(args.merged_dir))
+    else:
+        pytorch_model = gemma1.build_2b_model(str(args.merged_dir))
+
+    tflite_path = args.work_dir / "banksathi_gemma2b_int4.tflite"
+    edge_converter.convert_to_tflite(
+        pytorch_model,
+        output_path=str(args.work_dir),
+        output_name_prefix="banksathi_gemma2b_int4",
+        prefill_seq_len=args.context_len,
+        kv_cache_max_len=args.context_len,
+        quantize=quant_recipes.full_int8_dynamic_recipe()
+        if hasattr(quant_recipes, "full_int8_dynamic_recipe")
+        else True,
+    )
+
+    # 2. Bundle TFLite + Gemma SentencePiece tokenizer.model into a single .task file
+    tokenizer_model = args.merged_dir / "tokenizer.model"
+    if not tokenizer_model.exists():
+        raise FileNotFoundError(f"Expected SentencePiece tokenizer.model inside {args.merged_dir}")
+
+    # Pick generated .tflite file
+    generated_tflites = list(args.work_dir.glob("*.tflite"))
+    if not generated_tflites:
+        raise FileNotFoundError(f"No .tflite file produced in {args.work_dir}")
+    tflite_file = generated_tflites[0]
+
+    config = bundler.BundleConfig(
+        tflite_model=str(tflite_file),
+        tokenizer_model=str(tokenizer_model),
+        start_token="<bos>",
+        stop_tokens=["<eos>", "<end_of_turn>"],
+        output_filename=str(args.output_task),
+        enable_bytes_to_unicode_mapping=False,
+    )
+    bundler.create_bundle(config)
+
+    print(f"Success! MediaPipe GenAI bundle created at: {args.output_task}")
+    print("Install on Android:")
+    print(f"  1) Via BankSathi app Settings -> Import Gemma-2B (.task / .bin): select {args.output_task.name}")
+    print(f"  2) Or via ADB: adb push {args.output_task} /data/local/tmp/llm/gemma2-2b-it-cpu-int4.task")
+
+
+if __name__ == "__main__":
+    main()
