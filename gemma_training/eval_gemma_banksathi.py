@@ -93,3 +93,97 @@ def evaluate_live_model(model_dir: Path, eval_path: Path) -> dict[str, Any]:
     )
     model.eval()
 
+    json_ok = 0
+    intent_total = 0
+    intent_ok = 0
+    scam_total = 0
+    scam_ok = 0
+    abstain_total = 0
+    abstain_ok = 0
+    bilingual_ok = 0
+
+    for row in rows:
+        prompt_text = f"<start_of_turn>user\n{row['prompt']}<end_of_turn>\n<start_of_turn>model\n"
+        inputs = tokenizer(prompt_text, return_tensors="pt").to(model.device)
+        with torch.no_grad():
+            out = model.generate(
+                **inputs,
+                max_new_tokens=220,
+                do_sample=False,
+                eos_token_id=tokenizer.convert_tokens_to_ids("<end_of_turn>"),
+            )
+        gen_only = tokenizer.decode(out[0][inputs["input_ids"].shape[1] :], skip_special_tokens=True)
+        raw_json = extract_json_object(gen_only)
+        try:
+            pred = json.loads(raw_json)
+            json_ok += 1
+        except Exception:
+            continue
+
+        gold = row["target"]
+        if row["type"] == "assistant":
+            intent_total += 1
+            if pred.get("task") == gold["task"]:
+                intent_ok += 1
+
+            if gold["isScamAlert"]:
+                scam_total += 1
+                if pred.get("isScamAlert") is True and "1930" in pred.get("replyEn", ""):
+                    scam_ok += 1
+
+            if gold["abstained"]:
+                abstain_total += 1
+                if pred.get("abstained") is True and pred.get("task") == "NONE":
+                    abstain_ok += 1
+
+            if DEVANAGARI_RE.search(pred.get("replyHi", "")) and len(pred.get("replyEn", "").split()) <= 45:
+                bilingual_ok += 1
+        else:
+            if gold["riskLevel"] == "HIGH_RISK":
+                scam_total += 1
+                if pred.get("riskLevel") == "HIGH_RISK" and "1930" in pred.get("actionTipEn", ""):
+                    scam_ok += 1
+            if DEVANAGARI_RE.search(pred.get("explanationHi", "")):
+                bilingual_ok += 1
+
+    total = max(1, len(rows))
+    return {
+        "evaluated_rows": len(rows),
+        "valid_json_pct": round(100.0 * json_ok / total, 2),
+        "intent_accuracy_pct": round(100.0 * intent_ok / max(1, intent_total), 2),
+        "scamguard_recall_pct": round(100.0 * scam_ok / max(1, scam_total), 2),
+        "safe_abstention_pct": round(100.0 * abstain_ok / max(1, abstain_total), 2),
+        "bilingual_tts_pct": round(100.0 * bilingual_ok / total, 2),
+    }
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Evaluate BankSathi Gemma dataset or live checkpoint.")
+    parser.add_argument("--eval-file", type=Path, default=Path("data/eval.jsonl"))
+    parser.add_argument("--train-file", type=Path, default=Path("data/train.jsonl"))
+    parser.add_argument("--model-dir", type=Path, default=None, help="If omitted, runs dataset audit only.")
+    args = parser.parse_args()
+
+    if args.model_dir is None:
+        train_audit = audit_dataset(args.train_file) if args.train_file.exists() else None
+        eval_audit = audit_dataset(args.eval_file) if args.eval_file.exists() else None
+        leakage = 0
+        if train_audit and eval_audit:
+            leakage = len(train_audit.pop("_hashes") & eval_audit.pop("_hashes"))
+        elif train_audit:
+            train_audit.pop("_hashes", None)
+        elif eval_audit:
+            eval_audit.pop("_hashes", None)
+        report = {
+            "train_eval_leakage_count": leakage,
+            "train_audit": train_audit,
+            "eval_audit": eval_audit,
+        }
+    else:
+        report = evaluate_live_model(args.model_dir, args.eval_file)
+
+    print(json.dumps(report, indent=2, ensure_ascii=False))
+
+
+if __name__ == "__main__":
+    main()
