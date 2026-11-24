@@ -43,3 +43,32 @@ python train_gemma2b_qlora.py \
   --train-file data/train.jsonl \
   --eval-file data/eval.jsonl \
   --output-dir outputs/gemma2-2b-banksathi
+```
+This masks user prompt tokens (`DataCollatorForCompletionOnlyLM`) so loss is computed strictly on the structured JSON completions, then merges the LoRA adapter into `outputs/gemma2-2b-banksathi/merged_fp16`.
+
+### 3. Evaluate the Fine-Tuned Model
+```bash
+python eval_gemma_banksathi.py \
+  --model-dir outputs/gemma2-2b-banksathi/merged_fp16 \
+  --eval-file data/eval.jsonl
+```
+Target KPIs before deploying:
+- `valid_json_pct >= 99%`
+- `scamguard_recall_pct = 100%`
+- `safe_abstention_pct >= 95%`
+- `bilingual_tts_pct >= 98%`
+
+### 4. Quantize to INT4 & Bundle `.task` for MediaPipe Android
+```bash
+python convert_to_mediapipe.py \
+  --merged-dir outputs/gemma2-2b-banksathi/merged_fp16 \
+  --output-task outputs/gemma2-2b-banksathi-cpu-int4.task
+```
+
+### 5. Load Into BankSathi Android App
+- **Option A (In-App Import):** Copy `gemma2-2b-banksathi-cpu-int4.task` to the phone and open **BankSathi Settings -> Import Gemma-2B (.task / .bin)**.
+- **Option B (ADB Push):**
+  ```bash
+  adb push outputs/gemma2-2b-banksathi-cpu-int4.task /data/local/tmp/llm/gemma2-2b-it-cpu-int4.task
+  ```
+`HybridAiService.kt` automatically detects and loads it with `LlmInference` (`maxTokens = 512`).
